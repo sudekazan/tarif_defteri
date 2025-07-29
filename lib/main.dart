@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:tarif_defteri/sayfalar/klasorler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:tarif_defteri/auth_screen.dart';
+import 'package:tarif_defteri/sayfalar/klasorler.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 
-void main() {
-  runApp(const MyApp());
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const MyApp()); // MyApp zaten var ve buradan çağrılıyor.
 }
 
 enum AppTheme {
@@ -204,8 +211,24 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: KlasorlerWithTheme(onThemeChanged: _changeTheme, currentTheme: _currentTheme),
-      routes: {
+      home: StreamBuilder<User?>( // Firebase Auth'u import ettiğinizden emin olun: import 'package:firebase_auth/firebase_auth.dart';
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          if (snapshot.hasData) {
+            // Kullanıcı oturum açmışsa ana klasör ekranını göster
+            return KlasorlerWithTheme(onThemeChanged: _changeTheme, currentTheme: _currentTheme);
+          }
+          // Kullanıcı oturum açmamışsa kimlik doğrulama ekranını göster
+          return const AuthScreen();
+        },
+      ),      routes: {
         '/settings': (context) => SettingsPage(
           onThemeChanged: _changeTheme,
           currentTheme: _currentTheme,
