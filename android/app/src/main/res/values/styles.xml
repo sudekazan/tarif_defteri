@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="google_app_id">1:919442709959:android:5ae4405f5a5d9459d80de2</string>
+<string name="google_api_key">AIzaSyCAqKvoMx6gWbSFHdDG-zYgguTDjtAWWnk</string>
+<string name="project_id">tarifdefteriuygulamasi</string>
+<string name="firebase_url">https://tarifdefteriuygulamasi.firebaseio.com</string>
+<string name="google_storage_bucket">tarifdefteriuygulamasi.firebasestorage.app</string>
+<string name="gcm_defaultSenderId">919442709959</string>
+
+<string name="package_name">com.example.tarif_defteri</string>
+
+</resources>
+
