@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:tarif_defteri/sayfalar/klasor_ici.dart';
 import 'package:tarif_defteri/tarifler_data/klasor_data.dart';
 import 'package:tarif_defteri/tarifler_data/tarif_data.dart';
@@ -19,6 +20,10 @@ class _KlasorlerState extends State<Klasorler> {
   List<KlasorData> filtrelenmisKlasorler = [];
   TextEditingController aramaController = TextEditingController();
 
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _settingsKey = GlobalKey();
+  final GlobalKey _fabKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +31,18 @@ class _KlasorlerState extends State<Klasorler> {
     _klasorleriYukle().then((_) {
       // Klasörler yüklendikten sonra filtreli listeyi de güncelle
       _filtreleKlasorler('');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final shown = prefs.getBool('onboarding_shown_main') ?? false;
+      if (!shown && mounted) {
+        ShowCaseWidget.of(context).startShowCase([
+          _searchKey,
+          _settingsKey,
+          _fabKey,
+        ]);
+        await prefs.setBool('onboarding_shown_main', true);
+      }
     });
   }
 
@@ -156,19 +173,29 @@ class _KlasorlerState extends State<Klasorler> {
               });
             },
           )
-              : IconButton(
-            icon: const Icon(Icons.search,color: Colors.black,),
-            onPressed: () {
-              setState(() {
-                aramaYapiliyorMu = true;
-              });
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings,color: Colors.black,),
-            onPressed: () {
-              Navigator.pushNamed(context, '/settings');
-            },
+              : Showcase(
+                key: _searchKey,
+                title: 'Arama',
+                description: 'Klasörler içinde hızlıca arama yapabilirsiniz.',
+                child: IconButton(
+                  icon: const Icon(Icons.search,color: Colors.black,),
+                  onPressed: () {
+                    setState(() {
+                      aramaYapiliyorMu = true;
+                    });
+                  },
+                ),
+              ),
+          Showcase(
+            key: _settingsKey,
+            title: 'Ayarlar',
+            description: 'Tema ve koyu mod gibi uygulama ayarlarını buradan yapın.',
+            child: IconButton(
+              icon: const Icon(Icons.settings,color: Colors.black,),
+              onPressed: () {
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
           ),
         ],
       ),
@@ -283,10 +310,15 @@ class _KlasorlerState extends State<Klasorler> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _yeniKlasorEkle,
-        backgroundColor: Theme.of(context).floatingActionButtonTheme.backgroundColor,
-        child: const Icon(Icons.add, color: Colors.black),
+      floatingActionButton: Showcase(
+        key: _fabKey,
+        title: 'Yeni Klasör',
+        description: 'Buradan yeni bir klasör oluşturabilirsiniz.',
+        child: FloatingActionButton(
+          onPressed: _yeniKlasorEkle,
+          backgroundColor: Theme.of(context).floatingActionButtonTheme.backgroundColor,
+          child: const Icon(Icons.add, color: Colors.black),
+        ),
       ),
     );
   }

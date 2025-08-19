@@ -1,11 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:tarif_defteri/sayfalar/tarif_olusturma.dart';
+import 'package:tarif_defteri/sayfalar/tarif_detay.dart';
 import 'package:tarif_defteri/tarifler_data/klasor_data.dart';
 import 'package:tarif_defteri/tarifler_data/tarif_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:showcaseview/showcaseview.dart';
 
 class KlasorIci extends StatefulWidget {
   final KlasorData klasorData;
@@ -21,11 +24,28 @@ class _KlasorIciState extends State<KlasorIci> {
   List<TarifData> filtreliTarifler = [];
   bool aramaYapiliyorMu = false;
   TextEditingController aramaController = TextEditingController();
+  final GlobalKey _favKey = GlobalKey();
+  final GlobalKey _shareKey = GlobalKey();
+  final GlobalKey _deleteKey = GlobalKey();
+  final GlobalKey _addRecipeKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _tarifleriYukle();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final shown = prefs.getBool('onboarding_shown_list') ?? false;
+      if (!shown && mounted) {
+        ShowCaseWidget.of(context).startShowCase([
+          _favKey,
+          _shareKey,
+          _deleteKey,
+          _addRecipeKey,
+        ]);
+        await prefs.setBool('onboarding_shown_list', true);
+      }
+    });
   }
 
   Future<void> _tarifleriYukle() async {
@@ -39,7 +59,11 @@ class _KlasorIciState extends State<KlasorIci> {
           tarif_id: map['tarif_id'],
           tarif_adi: map['tarif_adi'],
           tarif_aciklama: map['tarif_aciklama'],
-          tarif_resim: map['tarif_resim'],
+          tarif_resimler: map['tarif_resimler'] != null
+              ? List<String>.from(map['tarif_resimler'])
+              : map['tarif_resim'] != null && map['tarif_resim'].isNotEmpty
+                  ? [map['tarif_resim']]
+                  : [],
           klasor_id: map['klasor_id'],
           isFavorite: map['isFavorite'] ?? false, // Yeni eklenen alanı buraya ekle
         );
@@ -70,7 +94,7 @@ class _KlasorIciState extends State<KlasorIci> {
       'tarif_id': yeniTarif.tarif_id,
       'tarif_adi': yeniTarif.tarif_adi,
       'tarif_aciklama': yeniTarif.tarif_aciklama,
-      'tarif_resim': yeniTarif.tarif_resim,
+      'tarif_resimler': yeniTarif.tarif_resimler,
       'klasor_id': yeniTarif.klasor_id,
       'isFavorite': yeniTarif.isFavorite, // Yeni eklenen alanı buraya ekle
     }));
@@ -88,7 +112,7 @@ class _KlasorIciState extends State<KlasorIci> {
         'tarif_id': guncelTarif.tarif_id,
         'tarif_adi': guncelTarif.tarif_adi,
         'tarif_aciklama': guncelTarif.tarif_aciklama,
-        'tarif_resim': guncelTarif.tarif_resim,
+        'tarif_resimler': guncelTarif.tarif_resimler,
         'klasor_id': guncelTarif.klasor_id,
         'isFavorite': guncelTarif.isFavorite, // Yeni eklenen alanı buraya ekle
       });
@@ -96,6 +120,8 @@ class _KlasorIciState extends State<KlasorIci> {
       _tarifleriYukle();
     }
   }
+
+
 
   void _tarifDuzenle(TarifData tarif) async {
     final guncelTarif = await Navigator.push(
@@ -125,7 +151,7 @@ class _KlasorIciState extends State<KlasorIci> {
             tarif_id: 0,
             tarif_adi: '',
             tarif_aciklama: '',
-            tarif_resim: '',
+            tarif_resimler: [],
             klasor_id: widget.klasorData.klasor_id,
             isFavorite: false, // Yeni eklenen alanı buraya ekle
           ),
@@ -137,43 +163,7 @@ class _KlasorIciState extends State<KlasorIci> {
     }
   }
 
-  bool _isBaslik(String line) {
-    final basliklar = [
-      'malzemeler', 'harç', 'hamuru', 'şerbeti', 'yapılışı'
-    ];
-    final trimmed = line.trim().toLowerCase();
-    return basliklar.any((b) => trimmed == b);
-  }
-
-  Widget _buildRichAciklama(String aciklama) {
-    final lines = aciklama.split('\n');
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(fontSize: 15, color: Theme.of(context).textTheme.bodyMedium?.color),
-        children: lines.map((line) {
-          final trimmed = line.trim();
-          if (_isBaslik(trimmed)) {
-            return TextSpan(
-              text: line + '\n',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).textTheme.bodyLarge?.color),
-            );
-                      } else if (trimmed.startsWith('*')) {
-              return TextSpan(
-                text: line + '\n',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color),
-              );
-                      } else if (RegExp(r'^(\\d+)\\.').hasMatch(trimmed)) {
-              return TextSpan(
-                text: line + '\n',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color),
-              );
-                      } else {
-              return TextSpan(text: line + '\n', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color));
-            }
-        }).toList(),
-      ),
-    );
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -228,8 +218,18 @@ class _KlasorIciState extends State<KlasorIci> {
                   itemBuilder: (context, index) {
                     var tarif = filtreliTarifler[index];
                     return GestureDetector(
-                      onTap: (){
-                        _tarifDuzenle(tarif);
+                      onTap: () async {
+                        // Detay sayfasına git
+                        final guncelTarif = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TarifDetay(tarif: tarif),
+                          ),
+                        );
+                        // Eğer tarif güncellendiyse, listeyi yenile
+                        if (guncelTarif != null && guncelTarif is TarifData) {
+                          _tarifGuncelle(guncelTarif);
+                        }
                       },
                       child: Card(
                         elevation: 2,
@@ -238,28 +238,74 @@ class _KlasorIciState extends State<KlasorIci> {
                         ),
                         color: Theme.of(context).cardColor,
                         child: SizedBox(
+                          height: 90,
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.restaurant_menu, color: Theme.of(context).primaryColor, size: 28),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
+                                // Küçük görsel (varsa)
+                                if (tarif.tarif_resimler.isNotEmpty)
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        File(tarif.tarif_resimler.first),
+                                        width: 60,
+                                        height: 60,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                
+                                // Tarif adı
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
                                         tarif.tarif_adi,
-                                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Theme.of(context).textTheme.bodyLarge?.color),
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                    IconButton(
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Detayları görmek için tıklayın',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              
+                                // Butonlar
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Favori butonu
+                                    Showcase(
+                                      key: index == 0 ? _favKey as GlobalKey : _favKey,
+                                      title: 'Favori',
+                                      description: 'Tarifi favorilerinize ekleyip çıkarabilirsiniz.',
+                                      child: IconButton(
                                       icon: Icon(
                                         tarif.isFavorite ? Icons.favorite : Icons.favorite_border,
                                         color: Colors.red,
+                                        size: 20,
                                       ),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                       onPressed: () async {
                                         setState(() {
                                           tarif.isFavorite = !tarif.isFavorite;
@@ -276,18 +322,43 @@ class _KlasorIciState extends State<KlasorIci> {
                                           await prefs.setStringList(key, tariflerJson);
                                         }
                                       },
+                                      ),
                                     ),
-                                    IconButton(
-                                      icon: Icon(Icons.share, color: Theme.of(context).primaryColor),
+                                    // Paylaş butonu
+                                    Showcase(
+                                      key: index == 0 ? _shareKey as GlobalKey : _shareKey,
+                                      title: 'Paylaş',
+                                      description: 'Tarifi arkadaşlarınızla paylaşabilirsiniz.',
+                                      child: IconButton(
+                                      icon: Icon(
+                                        Icons.share,
+                                        color: Theme.of(context).primaryColor,
+                                        size: 20,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                       onPressed: () {
                                         Share.share(
                                           '${tarif.tarif_adi}\n\n${tarif.tarif_aciklama}',
                                           subject: 'Tarif Paylaşımı',
                                         );
                                       },
+                                      ),
                                     ),
-                                    IconButton(
-                                      icon: Icon(Icons.clear, color: Theme.of(context).primaryColor),
+
+                                    // Silme butonu
+                                    Showcase(
+                                      key: index == 0 ? _deleteKey as GlobalKey : _deleteKey,
+                                      title: 'Sil',
+                                      description: 'Tarifi kalıcı olarak silebilirsiniz.',
+                                      child: IconButton(
+                                      icon: Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                       onPressed: () {
                                         showDialog(
                                           context: context,
@@ -313,11 +384,10 @@ class _KlasorIciState extends State<KlasorIci> {
                                           ),
                                         );
                                       },
+                                      ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                _buildRichAciklama(tarif.tarif_aciklama),
                               ],
                             ),
                           ),
@@ -327,10 +397,15 @@ class _KlasorIciState extends State<KlasorIci> {
                   },
                 ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _yeniTarifEkle,
-          backgroundColor: Theme.of(context).floatingActionButtonTheme.backgroundColor,
-          child:  const Icon(Icons.add, color: Colors.white),
+        floatingActionButton: Showcase(
+          key: _addRecipeKey,
+          title: 'Yeni Tarif',
+          description: 'Buradan yeni bir tarif ekleyebilirsiniz.',
+          child: FloatingActionButton(
+            onPressed: _yeniTarifEkle,
+            backgroundColor: Theme.of(context).floatingActionButtonTheme.backgroundColor,
+            child:  const Icon(Icons.add, color: Colors.white),
+          ),
         ),
     );
   }

@@ -4,6 +4,8 @@ import 'package:tarif_defteri/tarifler_data/tarif_data.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 
 class TarifOlusturma extends StatefulWidget {
   @override
@@ -11,7 +13,6 @@ class TarifOlusturma extends StatefulWidget {
   TarifData tarifData;
 
   TarifOlusturma({required this.tarifData});
-
 }
 
 class _TarifOlusturmaState extends State<TarifOlusturma> {
@@ -23,6 +24,34 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
   
   // Her section için TextField controller'ı
   Map<int, TextEditingController> sectionControllers = {};
+
+  // Görseli kalıcı klasöre kopyala
+  Future<String> _copyImageToPermanentLocation(String sourcePath) async {
+    try {
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final String imagesDir = path.join(appDir.path, 'tarif_images');
+      
+      // Images klasörünü oluştur
+      final Directory imagesDirectory = Directory(imagesDir);
+      if (!await imagesDirectory.exists()) {
+        await imagesDirectory.create(recursive: true);
+      }
+      
+      // Benzersiz dosya adı oluştur
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(sourcePath)}';
+      final String destinationPath = path.join(imagesDir, fileName);
+      
+      // Dosyayı kopyala
+      final File sourceFile = File(sourcePath);
+      final File destinationFile = await sourceFile.copy(destinationPath);
+      
+      return destinationFile.path;
+    } catch (e) {
+      print('Görsel kopyalama hatası: $e');
+      return sourcePath; // Hata durumunda orijinal yolu döndür
+    }
+  }
+
   Future<void> tarifiKaydet(String tarif_adi, String tarif_aciklama) async {
     print("Tarif Kayıt Edildi: ${tarif_adi} - ${tarif_aciklama}");
   }
@@ -33,6 +62,17 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
     tfTaridAdi.text = tarifData.tarif_adi;
     // Mevcut tarif açıklamasını sections'a dönüştür
     _parseExistingTarif(tarifData.tarif_aciklama);
+    // Mevcut görselleri yükle
+    _loadExistingImages(tarifData.tarif_resimler);
+  }
+
+  // Mevcut görselleri yükle
+  void _loadExistingImages(List<String> existingImagePaths) {
+    if (existingImagePaths.isNotEmpty) {
+      setState(() {
+        photos = existingImagePaths.map((path) => XFile(path)).toList();
+      });
+    }
   }
   @override
   void dispose() {
@@ -80,6 +120,11 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
         _addSectionIfNotEmpty(currentSection, currentType, currentItems);
         currentSection = 'Yapılışı';
         currentType = 'yapilis';
+        currentItems = [];
+      } else if (trimmed.toLowerCase() == 'linkler') {
+        _addSectionIfNotEmpty(currentSection, currentType, currentItems);
+        currentSection = 'Linkler';
+        currentType = 'linkler';
         currentItems = [];
       } else if (trimmed.startsWith('*') || trimmed.startsWith('•') || RegExp(r'^\d+\.').hasMatch(trimmed)) {
         // Madde ekle
@@ -262,6 +307,7 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
                 const PopupMenuItem(value: 'yapilis', child: Text('Yapılışı')),
                 const PopupMenuItem(value: 'hamur', child: Text('Hamuru')),
                 const PopupMenuItem(value: 'serbet', child: Text('Şerbeti')),
+                const PopupMenuItem(value: 'linkler', child: Text('Linkler')),
                 const PopupMenuItem(value: 'foto', child: Text('Fotoğraf Ekle')),
               ],
             ),
@@ -565,7 +611,7 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
                           ),
                           elevation: 2,
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           // Tarif adı kontrolü
                           if (tfTaridAdi.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -615,6 +661,10 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
                               for (int i = 0; i < section['items'].length; i++) {
                                 tarifAciklama += '${i + 1}. ${section['items'][i]}\n';
                               }
+                            } else if (section['type'] == 'linkler') {
+                              for (String item in section['items']) {
+                                tarifAciklama += '🔗 $item\n';
+                              }
                             } else {
                               for (String item in section['items']) {
                                 tarifAciklama += '* $item\n';
@@ -630,11 +680,19 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
                             ),
                           );
                           
+                          // Görselleri kalıcı klasöre kopyala
+                          List<String> resimYollari = [];
+                          if (photos.isNotEmpty) {
+                            resimYollari = await Future.wait(
+                              photos.map((photo) async => await _copyImageToPermanentLocation(photo.path))
+                            );
+                          }
+                          
                           Navigator.pop(context, TarifData(
                             tarif_id: widget.tarifData.tarif_id,
                             tarif_adi: tfTaridAdi.text.trim(),
                             tarif_aciklama: tarifAciklama.trim(),
-                            tarif_resim: widget.tarifData.tarif_resim,
+                            tarif_resimler: resimYollari,
                             klasor_id: widget.tarifData.klasor_id,
                           ));
                         },
@@ -666,6 +724,8 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
         return 'Hamuru';
       case 'serbet':
         return 'Şerbeti';
+      case 'linkler':
+        return 'Linkler';
       default:
         return '';
     }
@@ -683,6 +743,8 @@ class _TarifOlusturmaState extends State<TarifOlusturma> {
         return Icons.circle;
       case 'serbet':
         return Icons.water_drop;
+      case 'linkler':
+        return Icons.link;
       default:
         return Icons.category;
     }

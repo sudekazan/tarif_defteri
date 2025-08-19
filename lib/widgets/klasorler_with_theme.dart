@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../sayfalar/klasorler.dart';
 import '../screens/theme_settings_page.dart';
 import '../theme/app_theme.dart';
@@ -19,35 +20,37 @@ class KlasorlerWithTheme extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            const DrawerHeader(child: Text('Ayarlar')), 
-            ListTile(
-              title: const Text('Tema Seç'),
-              onTap: () {
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(
-                    builder: (context) => ThemeSettingsPage(
-                      onThemeChanged: onThemeChanged, 
-                      currentTheme: currentTheme
+    return ShowCaseWidget(
+      builder: (context) => Scaffold(
+        drawer: Drawer(
+          child: ListView(
+            children: [
+              const DrawerHeader(child: Text('Ayarlar')), 
+              ListTile(
+                title: const Text('Tema Seç'),
+                onTap: () {
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(
+                      builder: (context) => ThemeSettingsPage(
+                        onThemeChanged: onThemeChanged, 
+                        currentTheme: currentTheme
+                      )
                     )
-                  )
-                );
-              },
-            ),
-            const Divider(),
-            SwitchListTile(
-              title: const Text('Koyu Mod'),
-              value: isDarkMode,
-              onChanged: onDarkModeChanged,
-            ),
-          ],
+                  );
+                },
+              ),
+              const Divider(),
+              SwitchListTile(
+                title: const Text('Koyu Mod'),
+                value: isDarkMode,
+                onChanged: onDarkModeChanged,
+              ),
+            ],
+          ),
         ),
+        body: Klasorler(),
       ),
-      body: Klasorler(),
     );
   }
 }
